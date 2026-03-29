@@ -33,3 +33,42 @@ The backend also reads PostgreSQL connection settings from environment variables
 - `POSTGRES_PASSWORD` defaults to `postgres`
 
 Inside the dev container, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` are preconfigured to match the PostgreSQL sidecar.
+
+## REST API
+
+### List scan results
+
+`GET /api/scans`
+
+Supported query parameters:
+
+- `hostname` (partial match, case-insensitive)
+- `success` (`true` or `false`)
+- `agent_version` (exact match)
+- `reported_from` (ISO 8601 datetime)
+- `reported_to` (ISO 8601 datetime)
+- `limit` (default `50`, max `500`)
+- `offset` (default `0`)
+
+Example:
+
+`/api/scans?hostname=web&success=true&limit=25&offset=0`
+
+### Search scan results
+
+`GET /api/scans/search`
+
+This endpoint supports all list filters plus JSON content filters on `raw_scan_data`:
+
+- `json_key` and `json_value` (must be provided together)
+- `json_contains` (JSON object string used with PostgreSQL JSONB containment)
+
+Example key/value search:
+
+`/api/scans/search?json_key=warning_count&json_value=0`
+
+Example JSON containment search:
+
+`/api/scans/search?json_contains={"warning_count":"0"}`
+
+The search endpoint returns `400` if no JSON filter is provided, if only one of `json_key` or `json_value` is set, or if `json_contains` is not a valid JSON object.
