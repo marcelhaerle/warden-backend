@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
@@ -19,10 +20,13 @@ class AgentPayload(BaseModel):
     scan_data: dict[str, str]
 
 
-# Initialize Redis connection (asynchronous)
-# TODO read connection settings from environment variables
-redis_client = redis.Redis(host='localhost', port=6379,
-                           db=0, decode_responses=True)
+# Initialize Redis connection (asynchronous) from environment variables
+redis_client = redis.Redis(
+    host=os.getenv("REDIS_HOST", "localhost"),
+    port=int(os.getenv("REDIS_PORT", "6379")),
+    db=int(os.getenv("REDIS_DB", "0")),
+    decode_responses=True,
+)
 
 
 async def redis_worker():
