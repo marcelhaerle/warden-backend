@@ -59,8 +59,6 @@ async def redis_worker():
     except asyncio.CancelledError:
         logger.info("Redis worker is shutting down cleanly.")
 
-# 2. Lifespan manager for clean startup and shutdown
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -71,7 +69,6 @@ async def lifespan(app: FastAPI):
     task.cancel()
     await redis_client.close()
 
-# 3. The actual FastAPI application
 app = FastAPI(title="Warden API", lifespan=lifespan)
 
 
