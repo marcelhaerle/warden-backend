@@ -75,6 +75,11 @@ class ScanRunsResponse(BaseModel):
     items: list[ScanRunSummary]
 
 
+class ScanRunDetail(ScanRunSummary):
+    raw_scan_data: dict[str, Any]
+    received_at: datetime
+
+
 redis_client = redis.Redis(
     host=os.getenv("REDIS_HOST", "localhost"),
     port=int(os.getenv("REDIS_PORT", "6379")),
@@ -320,6 +325,18 @@ async def list_scan_results(
         limit=limit,
         offset=offset,
     )
+
+
+@app.get("/api/scans/{scan_id}", response_model=ScanRunDetail)
+async def get_scan_detail(scan_id: int):
+    pool = app.state.pool
+
+    row = await pool.fetchrow("SELECT * FROM scan_runs WHERE id = $1", scan_id)
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    return ScanRunDetail.model_validate(dict(row))
 
 
 @app.get("/api/scans/search", response_model=ScanRunsResponse)
