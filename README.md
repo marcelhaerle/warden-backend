@@ -73,6 +73,25 @@ Run tests:
 python -m pytest -q
 ```
 
+## CI/CD (GitHub Actions)
+
+The repository includes a workflow at `.github/workflows/ci-cd.yml` that:
+
+- checks formatting with `ruff format --check`
+- runs lint checks with `ruff check`
+- executes the test suite with `pytest`
+- builds a Docker image
+- publishes the image to Docker Hub on `push` to `main` and version tags (`v*`)
+
+Set these repository secrets in GitHub for Docker Hub publishing:
+
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN`
+
+Published image name:
+
+- `<DOCKERHUB_USERNAME>/warden-backend`
+
 ## Production Dependencies
 
 For production/runtime environments, install only runtime packages:
