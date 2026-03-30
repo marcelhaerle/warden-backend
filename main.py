@@ -7,9 +7,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 import asyncpg
+import redis.asyncio as redis
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
-import redis.asyncio as redis
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger("warden-backend")
@@ -54,16 +54,17 @@ class AgentPayload(BaseModel):
     scan_data: dict[str, str]
 
 
-class ScanRun(BaseModel):
+class ScanRunSummary(BaseModel):
     id: int
     agent_version: str
     hostname: str
     reported_at: datetime
     success: bool
     error: str | None = None
-    raw_scan_data: dict[str, Any]
     result_count: int
-    received_at: datetime
+    hardening_index: int | None = None
+    warnings: int | None = None
+    suggestions: int | None = None
 
 
 class ScanRunsResponse(BaseModel):
@@ -71,7 +72,7 @@ class ScanRunsResponse(BaseModel):
     count: int
     limit: int
     offset: int
-    items: list[ScanRun]
+    items: list[ScanRunSummary]
 
 
 redis_client = redis.Redis(
@@ -91,12 +92,7 @@ def parse_reported_at(timestamp: str) -> datetime:
 
 
 async def init_connection(conn):
-    await conn.set_type_codec(
-        'jsonb',
-        encoder=json.dumps,
-        decoder=json.loads,
-        schema='pg_catalog'
-    )
+    await conn.set_type_codec("jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
 
 
 async def create_postgres_pool() -> asyncpg.Pool:
@@ -193,9 +189,11 @@ async def fetch_scan_runs(
             reported_at,
             success,
             error,
-            raw_scan_data,
             result_count,
-            received_at
+            received_at,
+            CAST(raw_scan_data->>'hardening_index' AS INTEGER) AS hardening_index,
+            CAST(raw_scan_data->>'warnings' AS INTEGER) AS warnings,
+            CAST(raw_scan_data->>'suggestions' AS INTEGER) AS suggestions
         FROM scan_runs
         WHERE {where_clause}
         ORDER BY reported_at DESC, id DESC
@@ -207,7 +205,7 @@ async def fetch_scan_runs(
         offset,
     )
 
-    items = [ScanRun.model_validate(dict(row)) for row in rows]
+    items = [ScanRunSummary.model_validate(dict(row)) for row in rows]
     return ScanRunsResponse(
         total=total,
         count=len(items),
@@ -260,14 +258,12 @@ async def redis_worker(app: FastAPI):
 
                     pool = app.state.pool
                     scan_run_id = await save_scan_results(pool, payload)
-                    logger.info(
-                        f"Scan Run {scan_run_id} from {payload.hostname} saved.")
+                    logger.info(f"Scan Run {scan_run_id} from {payload.hostname} saved.")
 
                 except Exception as e:
                     logger.error(f"Error processing payload: {e}")
                     # If the DB is down, put the data back in the queue.
-                    logger.warning(
-                        "Putting payload back into Redis queue (Retry).")
+                    logger.warning("Putting payload back into Redis queue (Retry).")
                     await redis_client.lpush("warden_queue", raw_data)
                     # Prevents an endless loop in case of a permanent DB failure
                     await asyncio.sleep(5)
@@ -290,6 +286,7 @@ async def lifespan(app: FastAPI):
 
     await redis_client.close()
     await app.state.pool.close()
+
 
 app = FastAPI(title="Warden API", lifespan=lifespan)
 
@@ -361,9 +358,7 @@ async def search_scan_results(
     if json_key is not None and json_value is not None:
         key_param = len(params) + 1
         value_param = len(params) + 2
-        clauses.append(
-            f"jsonb_extract_path_text(raw_scan_data, ${key_param}) = ${value_param}"
-        )
+        clauses.append(f"jsonb_extract_path_text(raw_scan_data, ${key_param}) = ${value_param}")
         params.extend([json_key, json_value])
 
     if json_contains is not None:
