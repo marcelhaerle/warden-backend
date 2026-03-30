@@ -2,6 +2,19 @@
 
 Warden Backend Application
 
+## Overview
+
+Warden Backend is a FastAPI service that ingests host hardening scan results, stores them in PostgreSQL, and exposes APIs for querying scan history and operational security posture.
+
+At a high level, the application:
+
+- consumes scan payloads from a Redis queue (`warden_queue`) in a background worker
+- validates and persists scan runs with metadata and raw JSON result data
+- provides filterable scan listing and search APIs
+- exposes dashboard statistics such as host hardening buckets and recent failed scans
+
+This service is designed as the backend component for environments where agents periodically report scan findings and operators need a centralized API to inspect trends and identify hosts needing attention.
+
 ## Configuration
 
 The backend reads Redis connection settings from environment variables and falls back to local defaults when they are not set.
