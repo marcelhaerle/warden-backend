@@ -4,6 +4,14 @@ Warden Backend Application
 
 ## Configuration
 
+## Development
+
+Start the development server with:
+
+```bash
+uvicorn main:app --reload
+```
+
 ## Dev Container
 
 The dev container runs the application in one container and provisions Redis and PostgreSQL as sidecar services through Docker Compose.
