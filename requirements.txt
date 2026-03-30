@@ -4,3 +4,6 @@ redis
 pydantic
 asyncpg
 ruff
+pytest
+pytest-asyncio
+httpx
