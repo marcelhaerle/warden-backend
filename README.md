@@ -83,14 +83,9 @@ The repository includes a workflow at `.github/workflows/ci-cd.yml` that:
 - builds a Docker image
 - publishes the image to Docker Hub on `push` to `main` and version tags (`v*`)
 
-Set these repository secrets in GitHub for Docker Hub publishing:
-
-- `DOCKERHUB_USERNAME`
-- `DOCKERHUB_TOKEN`
-
 Published image name:
 
-- `<DOCKERHUB_USERNAME>/warden-backend`
+- `haerlemarcel/warden-backend`
 
 ## Production Dependencies
 
