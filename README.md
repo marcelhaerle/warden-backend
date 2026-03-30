@@ -47,6 +47,12 @@ The application follows a conventional FastAPI layered structure:
 
 ## Development
 
+Install development dependencies:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
 Start the development server with:
 
 ```bash
@@ -54,12 +60,6 @@ uvicorn main:app --reload
 ```
 
 ## Testing
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
 
 Run lint:
 
@@ -71,6 +71,14 @@ Run tests:
 
 ```bash
 python -m pytest -q
+```
+
+## Production Dependencies
+
+For production/runtime environments, install only runtime packages:
+
+```bash
+pip install -r requirements.txt
 ```
 
 ## Dev Container
