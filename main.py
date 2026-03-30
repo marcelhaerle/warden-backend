@@ -80,6 +80,26 @@ class ScanRunDetail(ScanRunSummary):
     received_at: datetime
 
 
+class HardeningBuckets(BaseModel):
+    danger: int  # < 50
+    medium: int  # 50 - 75
+    secure: int  # > 75
+
+
+class AttentionHost(BaseModel):
+    hostname: str
+    last_score: int | None
+    warning_count: int
+    last_scan: datetime
+
+
+class DashboardStats(BaseModel):
+    total_hosts: int
+    failed_scans_24h: int
+    buckets: HardeningBuckets
+    needs_attention: list[AttentionHost]
+
+
 redis_client = redis.Redis(
     host=os.getenv("REDIS_HOST", "localhost"),
     port=int(os.getenv("REDIS_PORT", "6379")),
@@ -390,3 +410,56 @@ async def search_scan_results(
         limit=limit,
         offset=offset,
     )
+
+
+@app.get("/api/dashboard/stats", response_model=DashboardStats)
+async def get_dashboard_stats():
+    pool = app.state.pool
+
+    async with pool.acquire() as conn:
+        latest_scans_sql = """
+            SELECT DISTINCT ON (hostname) 
+                hostname, 
+                success, 
+                reported_at,
+                CAST(raw_scan_data->>'hardening_index' AS INTEGER) as score,
+                CAST(raw_scan_data->>'warnings' AS INTEGER) as warnings
+            FROM scan_runs
+            ORDER BY hostname, reported_at DESC
+        """
+
+        rows = await conn.fetch(latest_scans_sql)
+
+        total_hosts = len(rows)
+        buckets = {"danger": 0, "medium": 0, "secure": 0}
+        attention_list = []
+
+        for r in rows:
+            score = r["score"]
+            warnings = r["warnings"] or 0
+
+            if score is not None:
+                if score < 50:
+                    buckets["danger"] += 1
+                elif score <= 75:
+                    buckets["medium"] += 1
+                else:
+                    buckets["secure"] += 1
+
+            if not r["success"] or warnings > 0 or (score and score < 50):
+                attention_list.append(
+                    AttentionHost(
+                        hostname=r["hostname"], last_score=score, warning_count=warnings, last_scan=r["reported_at"]
+                    )
+                )
+
+        failed_24h = await conn.fetchval(
+            "SELECT COUNT(*) FROM scan_runs WHERE success = false AND reported_at >= NOW() - INTERVAL '24 hours'"
+        )
+
+        return DashboardStats(
+            total_hosts=total_hosts,
+            failed_scans_24h=failed_24h,
+            buckets=HardeningBuckets(**buckets),
+            needs_attention=attention_list[:10],
+        )
